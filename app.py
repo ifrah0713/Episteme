@@ -150,13 +150,8 @@ st.markdown(f"""<style>
     border-right:1px solid {BORDER}!important;
     min-width:260px!important;
     max-width:260px!important;
-    transform:translateX(-260px);
-    display:block!important;
-    visibility:visible!important;
-    opacity:1!important;
 }}
 [data-testid="stSidebar"] *{{color:{TEXT_SIDE}!important}}
-[data-testid="collapsedControl"]{{display:none!important}}
 .main .block-container{{max-width:760px;margin:0 auto;padding-top:0!important;padding-bottom:8rem!important}}
 .greeting{{font-size:2.4rem;font-weight:600;color:{TEXT_MAIN};text-align:center;margin-top:8rem;margin-bottom:.3rem;letter-spacing:-.5px}}
 .greeting span{{color:{ACCENT}}}
