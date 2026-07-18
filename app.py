@@ -150,15 +150,10 @@ st.markdown(f"""<style>
     border-right:1px solid {BORDER}!important;
     min-width:260px!important;
     max-width:260px!important;
-    transform:translateX(0)!important;
+    transform:translateX(-260px);
     display:block!important;
     visibility:visible!important;
     opacity:1!important;
-}}
-section[data-testid="stSidebar"][aria-expanded="false"]{{
-    transform:translateX(0)!important;
-    min-width:260px!important;
-    display:block!important;
 }}
 [data-testid="stSidebar"] *{{color:{TEXT_SIDE}!important}}
 [data-testid="collapsedControl"]{{display:none!important}}
