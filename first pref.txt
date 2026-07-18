@@ -1,0 +1,527 @@
+# ============================================================
+# Episteme — Main Web App (app.py)
+# Purpose: Claude-style STEM Assistant with chat history
+# ============================================================
+
+import streamlit as st
+from generator  import generate_answer
+from pdf_loader import process_pdf
+from database   import (
+    create_chat, save_message,
+    load_messages, get_all_chats, delete_chat
+)
+
+# ─── Constants ────────────────────────────────────────────────
+MAX_PDFS = 7
+
+# ─── Page Configuration ───────────────────────────────────────
+st.set_page_config(
+    page_title = "Episteme",
+    page_icon  = "⚡",
+    layout     = "wide",
+)
+
+# ─── Initialize Session State ─────────────────────────────────
+if "messages"      not in st.session_state:
+    st.session_state.messages      = []
+if "uploaded_pdfs" not in st.session_state:
+    st.session_state.uploaded_pdfs = []
+if "dark_mode"     not in st.session_state:
+    st.session_state.dark_mode     = True
+if "chat_id"       not in st.session_state:
+    st.session_state.chat_id       = None
+if "user_name"     not in st.session_state:
+    st.session_state.user_name     = ""
+
+# ─── Theme Colors ─────────────────────────────────────────────
+if st.session_state.dark_mode:
+    BG_MAIN     = "#1a1a1a"
+    BG_SIDEBAR  = "#111111"
+    BG_INPUT    = "#2a2a2a"
+    BG_HOVER    = "#333333"
+    TEXT_MAIN   = "#e0e0e0"
+    TEXT_SUB    = "#666666"
+    TEXT_SIDE   = "#cccccc"
+    BORDER      = "#3a3a3a"
+    ACCENT      = "#4A90D9"
+    SOURCE_BG   = "#222222"
+    SOURCE_TEXT = "#7ab0d9"
+    THEME_ICON  = "☀️"
+    THEME_LABEL = "Light Mode"
+else:
+    BG_MAIN     = "#ffffff"
+    BG_SIDEBAR  = "#f5f5f5"
+    BG_INPUT    = "#f0f0f0"
+    BG_HOVER    = "#e8e8e8"
+    TEXT_MAIN   = "#1a1a1a"
+    TEXT_SUB    = "#888888"
+    TEXT_SIDE   = "#333333"
+    BORDER      = "#e0e0e0"
+    ACCENT      = "#4A90D9"
+    SOURCE_BG   = "#f0f7ff"
+    SOURCE_TEXT = "#1a5276"
+    THEME_ICON  = "🌙"
+    THEME_LABEL = "Dark Mode"
+
+# ─── CSS ──────────────────────────────────────────────────────
+st.markdown(f"""
+    <style>
+        #MainMenu  {{ visibility: hidden; }}
+        footer     {{ visibility: hidden; }}
+        header     {{ visibility: hidden; }}
+
+        .stApp {{
+            background-color : {BG_MAIN};
+            color            : {TEXT_MAIN};
+        }}
+
+        [data-testid="stSidebar"] {{
+            background-color : {BG_SIDEBAR};
+            border-right     : 1px solid {BORDER};
+        }}
+        [data-testid="stSidebar"] * {{
+            color : {TEXT_SIDE} !important;
+        }}
+
+        .main .block-container {{
+            max-width      : 720px;
+            margin         : 0 auto;
+            padding-top    : 0 !important;
+            padding-bottom : 7rem !important;
+        }}
+
+        /* ── Welcome Screen ── */
+        .welcome-box {{
+            max-width     : 420px;
+            margin        : 10rem auto 0;
+            text-align    : center;
+        }}
+        .welcome-title {{
+            font-size     : 2.8rem;
+            font-weight   : 600;
+            color         : {TEXT_MAIN};
+            font-family   : Georgia, serif;
+            margin-bottom : 0.3rem;
+        }}
+        .welcome-title span {{ color: {ACCENT}; }}
+        .welcome-sub {{
+            font-size     : 0.9rem;
+            color         : {TEXT_SUB};
+            margin-bottom : 2rem;
+        }}
+
+        /* ── Greeting ── */
+        .greeting {{
+            font-size     : 2.6rem;
+            font-weight   : 600;
+            color         : {TEXT_MAIN};
+            text-align    : center;
+            margin-top    : 8rem;
+            margin-bottom : 0.4rem;
+            font-family   : Georgia, serif;
+        }}
+        .greeting span {{ color: {ACCENT}; }}
+
+        .tagline {{
+            font-size     : 0.9rem;
+            color         : {TEXT_SUB};
+            text-align    : center;
+            margin-bottom : 3rem;
+        }}
+
+        /* ── Name input ── */
+        [data-testid="stTextInput"] input {{
+            background-color : {BG_INPUT} !important;
+            border           : 1px solid {BORDER} !important;
+            border-radius    : 10px !important;
+            color            : {TEXT_MAIN} !important;
+            font-size        : 0.95rem !important;
+            padding          : 10px 14px !important;
+            text-align       : center !important;
+        }}
+        [data-testid="stTextInput"] input:focus {{
+            border-color : {ACCENT} !important;
+            box-shadow   : none !important;
+        }}
+
+        /* ── Get Started button ── */
+        div[data-testid="stButton"] > button[kind="primary"] {{
+            background-color : {ACCENT} !important;
+            color            : white !important;
+            border           : none !important;
+            border-radius    : 10px !important;
+            padding          : 10px 24px !important;
+            font-size        : 0.95rem !important;
+            width            : 100% !important;
+            margin-top       : 0.5rem !important;
+        }}
+
+        [data-testid="stChatMessage"] {{
+            background-color : transparent !important;
+            border           : none !important;
+            max-width        : 720px;
+            margin           : 0 auto;
+            padding          : 0.3rem 0 !important;
+        }}
+
+        [data-testid="stBottom"] {{
+            background : transparent !important;
+            border     : none !important;
+            box-shadow : none !important;
+            padding    : 0 !important;
+        }}
+
+        .stChatFloatingInputContainer {{
+            background : transparent !important;
+            border     : none !important;
+            box-shadow : none !important;
+            padding    : 0 !important;
+            bottom     : 1.5rem !important;
+        }}
+
+        [data-testid="stChatInput"] {{
+            background-color : {BG_INPUT} !important;
+            border           : 1px solid {BORDER} !important;
+            border-radius    : 14px !important;
+            box-shadow       : none !important;
+            outline          : none !important;
+        }}
+        [data-testid="stChatInput"] > div {{
+            border        : none !important;
+            box-shadow    : none !important;
+            outline       : none !important;
+            border-radius : 14px !important;
+        }}
+        [data-testid="stChatInput"]:focus-within {{
+            border-color : {ACCENT} !important;
+            box-shadow   : none !important;
+            outline      : none !important;
+        }}
+        [data-testid="stChatInput"] textarea {{
+            background-color : {BG_INPUT} !important;
+            color            : {TEXT_MAIN} !important;
+            font-size        : 0.95rem !important;
+            border           : none !important;
+            outline          : none !important;
+            box-shadow       : none !important;
+            border-radius    : 14px !important;
+        }}
+        [data-testid="stChatInput"] textarea:focus {{
+            border     : none !important;
+            outline    : none !important;
+            box-shadow : none !important;
+        }}
+        [data-testid="stChatInput"] textarea::placeholder {{
+            color : {TEXT_SUB} !important;
+        }}
+
+        .stButton > button {{
+            background-color : transparent !important;
+            color            : {TEXT_SIDE} !important;
+            border           : none !important;
+            border-radius    : 6px !important;
+            font-size        : 0.82rem !important;
+            text-align       : left !important;
+            padding          : 5px 8px !important;
+            width            : 100% !important;
+            transition       : all 0.15s !important;
+            box-shadow       : none !important;
+        }}
+        .stButton > button:hover {{
+            background-color : {BG_HOVER} !important;
+            color            : {ACCENT} !important;
+        }}
+        .stButton > button:focus {{
+            box-shadow : none !important;
+            outline    : none !important;
+            border     : none !important;
+        }}
+
+        .source-box {{
+            background    : {SOURCE_BG};
+            border-left   : 3px solid {ACCENT};
+            padding       : 4px 10px;
+            border-radius : 4px;
+            font-size     : 0.75rem;
+            margin-top    : 4px;
+            color         : {SOURCE_TEXT};
+        }}
+
+        .pdf-success {{
+            background    : {"#1a2e1a" if st.session_state.dark_mode else "#e8f5e9"};
+            border-left   : 3px solid #4CAF50;
+            padding       : 4px 10px;
+            border-radius : 4px;
+            font-size     : 0.78rem;
+            color         : {"#90EE90" if st.session_state.dark_mode else "#2e7d32"};
+            margin-top    : 4px;
+        }}
+        .pdf-error {{
+            background    : {"#2e1a1a" if st.session_state.dark_mode else "#ffebee"};
+            border-left   : 3px solid #f44336;
+            padding       : 4px 10px;
+            border-radius : 4px;
+            font-size     : 0.78rem;
+            color         : {"#FFB3B3" if st.session_state.dark_mode else "#c62828"};
+            margin-top    : 4px;
+        }}
+
+        .research-badge {{
+            display       : inline-block;
+            background    : transparent;
+            border        : 1px solid {ACCENT};
+            border-radius : 10px;
+            padding       : 1px 8px;
+            font-size     : 0.72rem;
+            color         : {ACCENT};
+            margin-top    : 6px;
+            margin-right  : 4px;
+        }}
+
+        [data-testid="stFileUploaderDropzone"] {{
+            background-color : {BG_INPUT} !important;
+            border           : 1px dashed {BORDER} !important;
+            border-radius    : 6px !important;
+            padding          : 4px 8px !important;
+            min-height       : 40px !important;
+        }}
+        [data-testid="stFileUploaderDropzone"] p {{
+            font-size : 0.74rem !important;
+            margin    : 0 !important;
+        }}
+
+        ::-webkit-scrollbar       {{ width: 4px; }}
+        ::-webkit-scrollbar-track {{ background: transparent; }}
+        ::-webkit-scrollbar-thumb {{ background: {BORDER}; border-radius: 3px; }}
+
+        hr {{ border-color: {BORDER} !important; margin: 0.4rem 0 !important; }}
+    </style>
+""", unsafe_allow_html=True)
+
+# ─── Welcome Screen — Name Entry ──────────────────────────────
+if not st.session_state.user_name:
+    st.markdown(
+        f'<div class="welcome-box">'
+        f'<div class="welcome-title">⚡ <span>Episteme</span></div>'
+        f'<div class="welcome-sub">Science • Technology • Engineering • Mathematics</div>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        name = st.text_input(
+            label       = "name",
+            placeholder = "Enter your name to get started...",
+            label_visibility = "collapsed",
+        )
+        if st.button("Get Started →", type="primary", use_container_width=True):
+            if name.strip():
+                st.session_state.user_name = name.strip()
+                st.rerun()
+            else:
+                st.warning("Please enter your name!")
+    st.stop()
+
+# ─── Sidebar — shown after name entered ───────────────────────
+with st.sidebar:
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        st.markdown(
+            f"<b style='color:{ACCENT};font-size:1.1rem;'>⚡ Episteme</b>",
+            unsafe_allow_html=True
+        )
+    with col2:
+        if st.button(THEME_ICON, key="theme", help=THEME_LABEL):
+            st.session_state.dark_mode = not st.session_state.dark_mode
+            st.rerun()
+
+    # User name display
+    st.markdown(
+        f"<div style='font-size:0.78rem;color:{TEXT_SUB};margin:4px 0;'>"
+        f"👤 {st.session_state.user_name}</div>",
+        unsafe_allow_html=True
+    )
+
+    st.markdown("---")
+
+    if st.button("✏️  New chat", use_container_width=True, key="new_chat"):
+        st.session_state.messages      = []
+        st.session_state.uploaded_pdfs = []
+        st.session_state.chat_id       = None
+        st.rerun()
+
+    # Sign out
+    if st.button("🚪  Sign out", use_container_width=True, key="sign_out"):
+        st.session_state.user_name     = ""
+        st.session_state.messages      = []
+        st.session_state.uploaded_pdfs = []
+        st.session_state.chat_id       = None
+        st.rerun()
+
+    st.markdown("---")
+
+    # ─── PDF Upload ───────────────────────────────────────────
+    used      = len(st.session_state.uploaded_pdfs)
+    remaining = MAX_PDFS - used
+
+    st.markdown(
+        f"<div style='font-size:0.76rem;color:{TEXT_SUB};margin-bottom:4px;'>"
+        f"📎 PDFs ({used}/{MAX_PDFS})</div>",
+        unsafe_allow_html=True
+    )
+
+    if remaining > 0:
+        uploaded_files = st.file_uploader(
+            label                 = "Upload",
+            type                  = ["pdf"],
+            accept_multiple_files = True,
+            label_visibility      = "collapsed",
+            key                   = "pdf_upload",
+        )
+        if uploaded_files:
+            for f in uploaded_files[:remaining]:
+                if f.name not in st.session_state.uploaded_pdfs:
+                    with st.spinner("Processing..."):
+                        result = process_pdf(f)
+                    if result["success"]:
+                        st.session_state.uploaded_pdfs.append(f.name)
+                        st.markdown(
+                            f'<div class="pdf-success">✅ {f.name}</div>',
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.markdown(
+                            f'<div class="pdf-error">❌ {result["error"]}</div>',
+                            unsafe_allow_html=True,
+                        )
+    else:
+        st.caption("Max PDFs reached")
+
+    if st.session_state.uploaded_pdfs:
+        for pdf in st.session_state.uploaded_pdfs:
+            name = pdf[:22] + "..." if len(pdf) > 22 else pdf
+            st.markdown(
+                f"<div style='font-size:0.72rem;color:{TEXT_SUB};padding:1px 0;'>"
+                f"📄 {name}</div>",
+                unsafe_allow_html=True
+            )
+
+    st.markdown("---")
+
+    # ─── Recent Chats ─────────────────────────────────────────
+    st.markdown(
+        f"<div style='font-size:0.76rem;color:{TEXT_SUB};margin-bottom:5px;'>"
+        f"Recent Chats</div>",
+        unsafe_allow_html=True
+    )
+
+    all_chats = get_all_chats()
+
+    if not all_chats:
+        st.markdown(
+            f"<div style='font-size:0.74rem;color:{TEXT_SUB};'>"
+            f"No chats yet</div>",
+            unsafe_allow_html=True
+        )
+    else:
+        for chat in all_chats[:20]:
+            col_a, col_b = st.columns([5, 1])
+            with col_a:
+                label = chat["title"][:26] + "..." if len(chat["title"]) > 26 else chat["title"]
+                if st.button(label, key=f"chat_{chat['id']}", use_container_width=True):
+                    st.session_state.chat_id  = chat["id"]
+                    st.session_state.messages = load_messages(chat["id"])
+                    st.rerun()
+            with col_b:
+                if st.button("🗑", key=f"del_{chat['id']}"):
+                    delete_chat(chat["id"])
+                    if st.session_state.chat_id == chat["id"]:
+                        st.session_state.chat_id  = None
+                        st.session_state.messages = []
+                    st.rerun()
+
+    st.markdown("---")
+    st.markdown(
+        f"<div style='font-size:0.72rem;color:{TEXT_SUB};'>"
+        f"⚡ Knowledge runs deep</div>",
+        unsafe_allow_html=True
+    )
+
+# ─── Main Area ────────────────────────────────────────────────
+if not st.session_state.messages:
+    st.markdown(
+        f'<div class="greeting">'
+        f'How can I help you, <span>{st.session_state.user_name}</span>?'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        f'<div class="tagline">'
+        f'Science • Technology • Engineering • Mathematics'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+
+# ─── Chat History ─────────────────────────────────────────────
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# ─── Chat Input ───────────────────────────────────────────────
+prompt = st.chat_input("Ask Episteme anything...")
+
+# ─── Process Input ────────────────────────────────────────────
+if prompt:
+    if st.session_state.chat_id is None:
+        st.session_state.chat_id = create_chat(prompt[:40])
+
+    save_message(st.session_state.chat_id, "user", prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            response    = generate_answer(
+                query         = prompt,
+                chat_history  = st.session_state.messages[:-1],
+                uploaded_pdfs = st.session_state.uploaded_pdfs,
+            )
+            answer      = response["answer"]
+            sources     = list(set(response["sources"]))
+            is_research = response["is_research"]
+            pdf_used    = response.get("pdf_used", False)
+
+        st.markdown(answer)
+
+        if is_research:
+            st.markdown(
+                '<span class="research-badge">🔬 ArXiv papers used</span>',
+                unsafe_allow_html=True,
+            )
+        if pdf_used:
+            st.markdown(
+                '<span class="research-badge">📄 PDF content used</span>',
+                unsafe_allow_html=True,
+            )
+
+        if sources:
+            st.markdown(
+                f"<div style='font-size:0.75rem;color:{TEXT_SUB};"
+                f"margin-top:8px;'>Sources:</div>",
+                unsafe_allow_html=True
+            )
+            for src in sources[:4]:
+                st.markdown(
+                    f'<div class="source-box">{src}</div>',
+                    unsafe_allow_html=True,
+                )
+
+        full_response = f"{answer}\n\n**Sources:** {', '.join(sources[:3])}"
+        save_message(st.session_state.chat_id, "assistant", full_response)
+        st.session_state.messages.append({
+            "role"    : "assistant",
+            "content" : full_response,
+        })
