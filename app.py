@@ -150,6 +150,10 @@ st.markdown(f"""<style>
     border-right:1px solid {BORDER}!important;
     min-width:260px!important;
     max-width:260px!important;
+    transform:translateX(0)!important;
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
 }}
 [data-testid="stSidebar"] *{{color:{TEXT_SIDE}!important}}
 .main .block-container{{max-width:760px;margin:0 auto;padding-top:0!important;padding-bottom:8rem!important}}
