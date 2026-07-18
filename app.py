@@ -31,7 +31,12 @@ except ImportError:
 
 MAX_PDFS = 7
 
-st.set_page_config(page_title="Episteme", page_icon="⚡", layout="wide")
+st.set_page_config(
+    page_title="Episteme", 
+    page_icon="⚡", 
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
 # ─── Google OAuth ─────────────────────────────────────────────
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID")
