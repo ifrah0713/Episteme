@@ -146,10 +146,12 @@ st.markdown(f"""<style>
 *{{font-family:'Inter',sans-serif!important}}
 .stApp{{background:{BG_MAIN};color:{TEXT_MAIN}}}
 [data-testid="stSidebar"]{{
+position:fixed!important;
+z-index:999!important;
     background:{BG_SIDEBAR}!important;
     border-right:1px solid {BORDER}!important;
-    min-width:260px!important;
-    max-width:260px!important;
+    min-width:80vw!important;
+    max-width:80vw!important;
     transform:translateX(0)!important;
     display:block!important;
     visibility:visible!important;
