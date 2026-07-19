@@ -113,8 +113,12 @@ if not st.session_state.token:
 
 # ─── User Info ────────────────────────────────────────────────
 user_name  = st.session_state.user_info.get("name", "User")
+# ── Display name override (set when user enters their preferred name) ──
+if "user_name_override" in st.session_state:
+    user_name = st.session_state.user_name_override
 user_email = st.session_state.user_info.get("email", "")
 user_pic   = st.session_state.user_info.get("picture", "")
+
 # ─── Display Name Check ───────────────────────────────────────
 display_name = get_display_name(user_email)
 if not display_name:
@@ -125,7 +129,7 @@ if not display_name:
             name_input = st.text_input("What should I call you?", placeholder="Enter your name...")
             if st.button("Let's go! →") and name_input.strip():
                 save_display_name(user_email, name_input.strip())
-                st.session_state.display_name_set = True`n                
+                st.session_state.display_name_set = True
                 st.session_state.user_name_override = name_input.strip()
                 st.rerun()
         st.stop()
@@ -668,3 +672,4 @@ if prompt:
         "content": save_txt,
         "response_data": response,
     })
+    
