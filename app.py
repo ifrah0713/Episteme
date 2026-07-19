@@ -114,6 +114,22 @@ if not st.session_state.token:
 user_name  = st.session_state.user_info.get("name", "User")
 user_email = st.session_state.user_info.get("email", "")
 user_pic   = st.session_state.user_info.get("picture", "")
+# ─── Display Name Check ───────────────────────────────────────
+from database import get_display_name, save_display_name
+display_name = get_display_name(user_email)
+if not display_name:
+    if "display_name_set" not in st.session_state:
+        with st.container():
+            st.markdown("### 👋 One quick thing before we dive in!")
+            st.markdown("I'd love to know what to call you.")
+            name_input = st.text_input("What should I call you?", placeholder="Enter your name...")
+            if st.button("Let's go! →") and name_input.strip():
+                save_display_name(user_email, name_input.strip())
+                st.session_state.display_name_set = True
+                st.rerun()
+        st.stop()
+else:
+    user_name = display_name
 
 # ─── Theme ────────────────────────────────────────────────────
 D = st.session_state.dark_mode

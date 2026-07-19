@@ -164,3 +164,26 @@ def get_user() -> str:
 
 # ─── Initialize on Import ─────────────────────────────────────
 init_db()
+# ─── User Display Name ────────────────────────────────────────
+def get_display_name(email: str) -> str:
+    if USE_SUPABASE:
+        try:
+            result = supabase_client.table("users").select("display_name").eq("email", email).execute()
+            if result.data:
+                return result.data[0]["display_name"] or ""
+        except Exception as e:
+            print(f"Supabase error: {e}")
+    return ""
+
+def save_display_name(email: str, name: str):
+    from datetime import datetime
+    now = datetime.now().isoformat()
+    if USE_SUPABASE:
+        try:
+            existing = supabase_client.table("users").select("id").eq("email", email).execute()
+            if existing.data:
+                supabase_client.table("users").update({"display_name": name}).eq("email", email).execute()
+            else:
+                supabase_client.table("users").insert({"email": email, "display_name": name, "created_at": now}).execute()
+        except Exception as e:
+            print(f"Supabase error: {e}")
