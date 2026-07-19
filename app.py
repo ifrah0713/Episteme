@@ -14,6 +14,7 @@ from pdf_loader import process_pdf
 from database import (
     create_chat, save_message, load_messages,
     get_all_chats, delete_chat, save_user, get_user,
+    get_display_name, save_display_name,
 )
 from dotenv import load_dotenv
 
@@ -115,7 +116,6 @@ user_name  = st.session_state.user_info.get("name", "User")
 user_email = st.session_state.user_info.get("email", "")
 user_pic   = st.session_state.user_info.get("picture", "")
 # ─── Display Name Check ───────────────────────────────────────
-from database import get_display_name, save_display_name
 display_name = get_display_name(user_email)
 if not display_name:
     if "display_name_set" not in st.session_state:
